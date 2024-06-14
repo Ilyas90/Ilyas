@@ -1,0 +1,172 @@
+from functools import reduce
+import random
+import time
+import os
+import requests
+
+
+for i in range(1000):
+    def luhn(code):
+        LOOKUP = (0, 2, 4, 6, 8, 1, 3, 5, 7, 9)
+        code = reduce(str.__add__, filter(str.isdigit, code))
+        evens = sum(int(i) for i in code[-1::-2])
+        odds = sum(LOOKUP[int(i)] for i in code[-2::-2])
+        return ((evens + odds) % 10 == 0)
+    while True:
+        y = int(random.randint(2200021580000000, 2200021589999999))
+        if luhn(f'{y}') == 1:
+            print(y)
+            break
+
+
+    PreParebatch = {
+        "batches": [
+            {
+                "terminalId": "19901990",
+                "batchId": "629502448",
+                "messages": [
+                    {
+                        "messageType": 100,
+                        "fields": [
+                            {"id": 2, "value": f"{y}"},
+                            {"id": 4, "value": "77700"},
+                            {"id": 11, "value": 2},
+                            {"id": 12, "value": "2024-02-09T16:00:00"},  # дату ставим сегодняшнюю
+                            {"id": 14, "value": "1223"},
+                            {"id": 22, "subelements": [
+                                {"id": 1, "value": "07"},
+                                {"id": 2, "value": "2"}
+                            ]
+                             },
+                            {"id": 35, "value": f"{y}=23122011069961700000"},
+                            {"id": 37, "value": "15"},
+                            {"id": 48, "subelements": [
+                                {"id": 1, "value": "X"},
+                                {"id": 22, "value": "S"},
+                                {"id": 64, "subfields": [
+                                    {"id": 1, "value": "05"},
+                                    {"id": 2, "value": "01"}
+                                ]
+                                 }
+                            ]
+                             },
+                            {"id": 55,
+                             "value": "9F2608B9B2D221C6EB65619F2701809F10120110A04003220000000000000000000000FF9F36020255820219809F37047D548DB6950500000080009A031808279C01009F02060000000003005F2A0206439F1A0206435F3401019F33036008C89F34031F03009F6E07064300003030009F0306000000000000"},
+                            {"id": 61, "subelements": [
+                                {"id": 1, "value": "1"},
+                                {"id": 3, "value": "0"},
+                                {"id": 4, "value": "0"},
+                                {"id": 5, "value": "0"},
+                                {"id": 6, "value": "0"},
+                                {"id": 7, "value": "0"},
+                                {"id": 10, "value": "0"},
+                                {"id": 11, "value": "3"}
+                            ]
+                             },
+                            {"id": 62, "subelements": [
+                                {"id": 1, "value": "20381"},
+                                {"id": 2, "value": "10457"},
+                                {"id": 3, "value": "0"},
+                                {"id": 4, "value": "1"},
+                                {"id": 5, "subfields": [
+                                    {"id": 1, "value": "322"},
+                                    {"id": 2, "value": "323"}
+                                ]},
+                                {"id": 8, "value": "2"},
+                                {"id": 9, "value": "3"},
+                                {"id": 14, "value": ""},
+                                {"id": 16, "value": "6122"}
+                            ]
+                             }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+
+    url = "https://test-tkp.secgw.ru/api/compress"
+    response = requests.post(url, headers={'Content-Type': 'application/json'}, json=PreParebatch,verify=False)  # Запрос Preparebatch
+    b = response.text
+    print(b)
+    authBatch = {
+        "messageInfo": {
+            "correlationId": "19901990",
+            "status": "string",
+            "operation": "put",
+            "addressing": {
+                "endpoint": "tkp_async_auth_batch",
+                "queueName": "default"
+            }
+        },
+        "headers": [
+            {
+                "name": "digest-value",
+                "value": "aa6e8de36efad3a1cd57b2d3d3a7bdac625730f9"
+            }
+        ],
+        "encoded-content": f'{b}',
+        "auth": {
+            "token": "5c18c227-8a6d-4baf-a6e5-92ab3d783b58"
+        }
+    }
+
+    url = "http://10.132.3.27:5003/api/v2/authBatch"
+    response = requests.post(url, headers={'Content-Type': 'application/json'}, json=authBatch,verify=False)
+    a = response.text
+    print(a)
+    time.sleep(2)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
