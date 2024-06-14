@@ -1,0 +1,30 @@
+
+import os
+import time
+import keyboard
+
+cmd = r'C:\windows\system32\cmd.exe' # вызываем командную строку
+os.system("start "+cmd)
+time.sleep(2)
+keyboard.write(r"adb shell")  # ввод команды
+keyboard.press("Enter")  # нажатие кнопки enter
+time.sleep(5)
+keyboard.write(r"run-as com.aorr.tkpcashdesk")  # переход в папку com.aorr.tkpcashdesk
+time.sleep(2)
+keyboard.press("Enter")  # нажатие кнопки enter
+
+keyboard.write(r"cat /data/data/com.aorr.tkpcashdesk/bl1.db > /sdcard/bl1.db & cat /data/data/com.aorr.tkpcashdesk/bl2.db > /sdcard/bl2.db & cat /data/data/com.aorr.tkpcashdesk/bl_par1.db > /sdcard/bl_par1.db & cat /data/data/com.aorr.tkpcashdesk/bl_par2.db > /sdcard/bl_par2.db & cat /data/data/com.aorr.tkpcashdesk/bl_uid1.db > /sdcard/bl_uid1.db & cat /data/data/com.aorr.tkpcashdesk/bl_uid2.db > /sdcard/bl_uid2.db & cat /data/data/com.aorr.tkpcashdesk/blserials1.db > /sdcard/blserials1.db & cat /data/data/com.aorr.tkpcashdesk/blserials2.db > /sdcard/blserials2.db & cat /data/data/com.aorr.tkpcashdesk/complex.db > /sdcard/complex.db & cat /data/data/com.aorr.tkpcashdesk/gl.db > /sdcard/gl.db & cat /data/data/com.aorr.tkpcashdesk/gl1.db > /sdcard/gl1.db & cat /data/data/com.aorr.tkpcashdesk/gl2.db > /sdcard/gl2.db & cat /data/data/com.aorr.tkpcashdesk/gps.db > /sdcard/gps.db & cat /data/data/com.aorr.tkpcashdesk/grz.db > /sdcard/grz.db & cat /data/data/com.aorr.tkpcashdesk/ivanovo_cards.db > /sdcard/ivanovo_cards.db & cat /data/data/com.aorr.tkpcashdesk/mifare_cards.db > /sdcard/mifare_cards.db & cat /data/data/com.aorr.tkpcashdesk/photo2_1.db > /sdcard/photo2_1.db & cat /data/data/com.aorr.tkpcashdesk/photo2_2.db > /sdcard/photo2_2.db & cat /data/data/com.aorr.tkpcashdesk/rrpay.db > /sdcard/rrpay.db & cat /data/data/com.aorr.tkpcashdesk/soccards.db > /sdcard/soccards.db & cat /data/data/com.aorr.tkpcashdesk/trz.db > /sdcard/trz.db & cat /data/data/com.aorr.tkpcashdesk/vtrz.db > /sdcard/vtrz.db & cat /data/data/com.aorr.tkpcashdesk/wl.db > /sdcard/wl.db & cat /data/data/com.aorr.tkpcashdesk/wl1.db > /sdcard/wl1.db & cat /data/data/com.aorr.tkpcashdesk/wl2.db > /sdcard/wl2.db & cat /data/data/com.aorr.tkpcashdesk/zkcards.db > /sdcard/zkcards.db  ")  # скачиваем базы в папку sdcard
+time.sleep(5)
+keyboard.press("Enter")  # нажатие кнопки enter
+time.sleep(10)
+keyboard.write(r"exit")  # выход
+time.sleep(2)
+keyboard.press("Enter")  # нажатие кнопки
+time.sleep(10)
+keyboard.write(r"exit")  # выход из shell
+keyboard.press("Enter")  # нажатие кнопки exit
+time.sleep(2)
+keyboard.write(r"adb pull /sdcard/bl1.db /adb/base & adb pull /sdcard/bl2.db /adb/base & adb pull /sdcard/bl_par1.db /adb/base & adb pull /sdcard/bl_par2.db /adb/base & adb pull /sdcard/bl_uid1.db /adb/base & adb pull /sdcard/bl_uid2.db /adb/base & adb pull /sdcard/blserials1.db /adb/base & adb pull /sdcard/blserials2.db /adb/base & adb pull /sdcard/complex.db /adb/base & adb pull /sdcard/gl.db /adb/base & adb pull /sdcard/gl1.db /adb/base & adb pull /sdcard/gl2.db /adb/base & adb pull /sdcard/gps.db /adb/base & adb pull /sdcard/grz.db /adb/base & adb pull /sdcard/ivanovo_cards.db /adb/base & adb pull /sdcard/mifare_cards.db /adb/base & adb pull /sdcard/photo2_1.db /adb/base & adb pull /sdcard/photo2_2.db /adb/base & adb pull /sdcard/rrpay.db /adb/base & adb pull /sdcard/soccards.db /adb/base & adb pull /sdcard/trz.db /adb/base & adb pull /sdcard/vtrz.db /adb/base & adb pull /sdcard/wl.db /adb/base & adb pull /sdcard/wl1.db /adb/base & adb pull /sdcard/wl2.db /adb/base & adb pull /sdcard/zkcards.db /adb/base") # скачиваем базы из папки sdcard в папку на ПК C:\adb\base (папку base нужно создать до запуска скрипта!!!)
+keyboard.press("Enter")  # нажатие кнопки
+print("Базы из папки com.aorr.tkpcashdesk скачены")
+
