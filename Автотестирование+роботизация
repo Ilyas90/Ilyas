@@ -1,0 +1,570 @@
+# Автотест авторизация, открытие смены,выбор маршрута, проведение транзакций по БК, ТК (emv,mifare,ЗК),закрытие смены, получение Z-отчета из ТКП
+# servo_1 -сервопривод для поворота манипулятора
+# servo_2 - сервопривод для открывания и закрывания клешни
+# servo_3 - правый сервопривод (дуга)
+# servo_4 - левый сервопривод для отпускания и поднятия карт
+import sys
+from ctypes import *
+import time
+import platform
+import os
+import requests
+
+cmd = r'C:\windows\system32\cmd.exe' # вызываем командную строку
+os.system("start "+cmd)
+cmd = 'adb devices' # команда для конекта с AQSI (ip адрес AQSI находится в разделе "О телефоне" > "Общая информация" > IP-адрес
+os.system(cmd)
+cmd = 'adb shell input tap 515 771' # команда для нажатия кнопки Разрешить : Разрешить приложению АРМ водителя доступ к данным о местоположении устройства
+for i in range (1,4):
+    os.system(cmd)
+time.sleep(1)
+cmd = 'adb shell input tap 90 302' # команда для нажатия поля Номер терминала
+os.system(cmd)
+cmd = 'adb shell input text "15111111"' # ввод  Номера терминала
+os.system(cmd)
+cmd = 'adb shell input tap 126 635' # команда для нажатия поля Имя пользователя
+os.system(cmd)
+cmd = 'adb shell input text "1"' # ввод  Имя пользователя
+os.system(cmd)
+cmd = 'adb shell input tap 60 550' # команда для нажатия поля Пароль
+os.system(cmd)
+cmd = 'adb shell input text "111111"' # ввод  Пароля
+os.system(cmd)
+cmd = 'adb shell input tap 277 695' # команда для нажатия  кнопки "Войти"
+os.system(cmd)
+time.sleep(5)
+
+script = {
+    "auth": {
+        "login": "1",
+        "password": "111111",
+        "terminalId": "15111111"
+    }
+}
+
+
+url = "https://test-tkp.secgw.ru/v2-test-rr/authenticate"
+response = requests.post(url, headers={'Content-Type': 'application/json'}, json=script,verify=False)          # Запрос на авторизациию
+
+
+if '"responseMessage":"success"' in response.text:
+    print("Авторизация ", ":1 тест пройден")
+else:
+    print("Ошибка при авторизации")
+
+
+print(response.json())
+
+token = response.json()['auth']['token']   # токен авторизации
+print('token авторизации', token)
+time.sleep(2)
+cmd = 'adb shell input tap 353 540' # команда для нажатия  кнопки "Открыть смену"
+os.system(cmd)
+time.sleep(2)
+cmd = 'adb shell input tap 318 672' # команда для нажатия  вида транспорта Троллейбус
+os.system(cmd)
+cmd = 'adb shell input tap 185 436' # команда для нажатия  поля Госномер ТС
+os.system(cmd)
+cmd = 'adb shell input text "1"' # ввод  Госномера ТС
+os.system(cmd)
+cmd = 'adb shell input tap 240 569' # команда для нажатия  кнопки Открытие смены
+os.system(cmd)
+
+script = {
+    "auth": {
+        "token": f'{token}'  # токен авторизации из скрипта Авторизации
+    }
+}
+
+
+url = "https://test-tkp.secgw.ru/v2-test-rr/openShift"
+response = requests.post(url, json=script,verify=False)                # Запрос на  открытие смены водителя
+print(response.json())
+
+if '"responseMessage":"success"' in response.text:
+    print("Открытие смены", ":2 тест пройден")
+
+else:
+    print("Ошибка при Открытие смены")
+    exit()
+time.sleep(2)
+
+cmd = 'adb shell input tap 282 672' # команда для нажатия  кнопки "Выбрать маршрут и начать рейс"
+os.system(cmd)
+time.sleep(2)
+cmd = 'adb shell input tap 278 960' # команда для нажатия  кнопки "Маршрут 33"
+os.system(cmd)
+time.sleep(1)
+# Подключаем внешнюю библиотеку для работы с SDK
+platform = platform.system()
+if platform == "Windows":
+    lib = cdll.LoadLibrary("C:/Program Files (x86)/RoboIntellect/ri_sdk/ri_sdk_x64/CH341DLLA64.dll")
+    lib = cdll.LoadLibrary("C:/Program Files (x86)/RoboIntellect/ri_sdk/ri_sdk_x64/librisdk.dll")
+
+# Объявление аргументов вызываемых функций.
+lib.RI_SDK_InitSDK.argtypes = [c_int, c_char_p]
+lib.RI_SDK_CreateModelComponent.argtypes = [c_char_p, c_char_p, c_char_p, POINTER(c_int), c_char_p]
+lib.RI_SDK_LinkPWMToController.argtypes = [c_int, c_int, c_uint8, c_char_p]
+lib.RI_SDK_LinkServodriveToController.argtypes = [c_int, c_int, c_int, c_char_p]
+
+lib.RI_SDK_sensor_VoltageSensor_Voltage.argtypes = [c_int, POINTER(c_float), c_char_p]
+lib.RI_SDK_sigmod_PWM_ResetAll.argtypes = [c_int, c_char_p]
+lib.RI_SDK_DestroyComponent.argtypes = [c_int, c_char_p]
+lib.RI_SDK_DestroySDK.argtypes = [c_bool, c_char_p]
+lib.RI_SDK_exec_ServoDrive_Rotate.argtypes = [c_int, c_int, c_int, c_bool, c_char_p]
+lib.RI_SDK_exec_ServoDrive_Turn.argtypes = [c_int, c_int, c_int, c_bool, c_char_p]
+
+# Объявление переменных для компонент необходимых для работы с ri_sdk
+errTextC = create_string_buffer(1000)  # Перменная, в которую будет записываться текст ошибки
+errCode = c_int()  # Переменная, в которую будет записываться код ошибки
+i2c = c_int()  # Переменная, в которой будет храниться дескриптор на объект i2c адаптера
+pwm = c_int()  # Переменная, в которой будет храниться дескриптор на объект pwm модулятора
+
+# Переменные, в которых будут храниться дескрипторы сервоприводов
+servo_1 = c_int()
+servo_2 = c_int()
+servo_3 = c_int()
+servo_4 = c_int()
+servo_5 = c_int()
+
+
+def main():
+    #########################################################
+    ################ Инициализация RI SDK. ##################
+
+    errCode = lib.RI_SDK_InitSDK(2, errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+    # Инициализация i2c адаптера.
+    errCode = lib.RI_SDK_CreateModelComponent("connector".encode(), "i2c_adapter".encode(), "ch341".encode(), i2c,
+                                              errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+    # Инициализация ШИМ.
+    errCode = lib.RI_SDK_CreateModelComponent("connector".encode(), "pwm".encode(), "pca9685".encode(), pwm, errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+    # Связывание ШИМ с i2c адаптером.
+    errCode = lib.RI_SDK_LinkPWMToController(pwm, i2c, c_uint8(0x40), errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+    # Инициализация сервопривода.
+    errCode = lib.RI_SDK_CreateModelComponent("executor".encode(), "servodrive".encode(), "mg90s".encode(), servo_1,
+                                              errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+    # Инициализация сервопривода.
+    errCode = lib.RI_SDK_CreateModelComponent("executor".encode(), "servodrive".encode(), "mg90s".encode(), servo_2,
+                                              errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+    errCode = lib.RI_SDK_CreateModelComponent("executor".encode(), "servodrive".encode(), "mg90s".encode(), servo_3,
+                                              errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+    # Инициализация сервопривода.
+    errCode = lib.RI_SDK_CreateModelComponent("executor".encode(), "servodrive".encode(), "mg90s".encode(), servo_4,
+                                              errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+    # Инициализация сервопривода.
+    errCode = lib.RI_SDK_CreateModelComponent("executor".encode(), "servodrive".encode(), "mg90s".encode(), servo_5,
+                                              errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+    # Связывание сервопривода с ШИМ.
+    errCode = lib.RI_SDK_LinkServodriveToController(servo_1, pwm, 0, errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+    # Связывание сервопривода с ШИМ.
+    errCode = lib.RI_SDK_LinkServodriveToController(servo_2, pwm, 1, errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+    # Связывание сервопривода с ШИМ.
+    errCode = lib.RI_SDK_LinkServodriveToController(servo_3, pwm, 2, errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+    # Связывание сервопривода с ШИМ.
+    errCode = lib.RI_SDK_LinkServodriveToController(servo_4, pwm, 3, errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+    # Связывание сервопривода с ШИМ.
+    errCode = lib.RI_SDK_LinkServodriveToController(servo_5, pwm, 4, errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    # Моментальный поворот сервопривода к значению угла, соответствующему длине управляющего импульса в 1500 микросекунд
+    errCode = lib.RI_SDK_exec_ServoDrive_TurnByPulse(servo_1, 1500, errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+    # Моментальный поворот сервопривода к значению угла, соответствующему длине управляющего импульса в 600 микросекунд
+    errCode = lib.RI_SDK_exec_ServoDrive_TurnByPulse(servo_2, 600, errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+    # Моментальный поворот сервопривода к значению угла, соответствующему длине управляющего импульса в 2000 микросекунд
+    errCode = lib.RI_SDK_exec_ServoDrive_TurnByPulse(servo_3, 2000, errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+    # Моментальный поворот сервопривода к значению угла, соответствующему длине управляющего импульса в 1000 микросекунд
+    errCode = lib.RI_SDK_exec_ServoDrive_TurnByPulse(servo_4, 1000, errTextC)
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+        #Первоначальный вид
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_1, 0, 100, False, errTextC)  # стартовая позиция!!!!
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    cmd = 'adb shell input tap 325 953'  # команда для нажатия  кнопки "Базовый (карта)"
+    os.system(cmd)
+
+  #### ПЕРВАЯ КАРТА
+
+
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_1, -40, 150, False, errTextC)  # поворот на 40 градусов    для взятии ПЕРВОЙ КАРТЫ!!!!
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_2, 200, 100, False, errTextC)  # открываем клешню
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_3, -85, 100, False, errTextC)  # правый сервопривод отпускаем
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_4, 85, 100, False, errTextC) # левый сервопривод отпускаемся
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_2, -200, 100, False, errTextC)  # закрываем клешню
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_3, 85, 100, False, errTextC)  # правый сервопривод поднимается
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_4, -85, 100, False, errTextC)  # левый сервопривод поднимается
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    print("Success")
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_1, -60, 150, False, errTextC)  # поворот на 60 градусов против часовой со скростью 150 % для прикладывания  1 КАРТЫ!!!!
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_4, 55, 100, False,errTextC)  # правый сервопривод отпускаем для прикладывания карты
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    time.sleep(3) # ждем прикладывание
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_4, -65, 100, False,errTextC)  # левый сервопривод поднимаем руку
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    time.sleep(3)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_1, 35, 150, False,errTextC)  # 1 серво привод сервопривод поворачивается на 35 градусов
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_2, 200, 100, False, errTextC)  # открываем клешню для сброса карты 1
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    time.sleep(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_2, -200, 100, False, errTextC)  # закрываем клешню
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    cmd = 'adb shell input tap 325 953'  # команда для нажатия  кнопки "Базовый (карта)"
+    os.system(cmd)
+        #  2 КАРТА ДЕЙСТВИЯ
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_1, 45, 100, False,errTextC)  # поворачиваемся на 45  градусов ко 2 КАРТЕ
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    time.sleep(1)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_2, 200, 100, False,errTextC)  # открываем клешни
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    time.sleep(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_3, -55, 100, False, errTextC)  # отпускается левый сервопривод
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_4, 55, 100, False, errTextC)  # отпускается правый сервопривод
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_2, -200, 100, False, errTextC)  # закрываем клешни
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    time.sleep(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_3, 55, 100, False, errTextC)  # поднимаем левый сервопривод
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_4, -55, 100, False, errTextC)  # поднимаем правый сервопривод
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_1, -75, 100, False, errTextC)  # поворачиваем на 75 градусов к считывателю
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_4, 55, 100, False,errTextC)  # левый сервопривод отпускаем для прикладывания карты
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    time.sleep(3)  # ждем прикладывание
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_4, -55, 100, False,errTextC)  # левый сервопривод поднимаем
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_1, 35, 150, False, errTextC)  # 1 серво привод сервопривод поворачивается на 35 градусов
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_2, 200, 100, False, errTextC)  # открываем клешню для сброса карты 1
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    time.sleep(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_2, -200, 100, False,errTextC)  # закрываем клешню
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    cmd = 'adb shell input tap 325 953'  # команда для нажатия  кнопки "Базовый (карта)"
+    os.system(cmd)
+
+        #3 КАРТУ забирает
+
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_1, 85, 150, False,errTextC)  # 1 сервопривод поворачивается на 85 градусов к 3 карте
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_2, 200, 150, False,errTextC)  # открываем клешни
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_3, -55, 100, False, errTextC)  # отпускается правый сервопривод
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_4, 55, 100, False, errTextC)  # отпускается левый сервопривод
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_2, -200, 150, False, errTextC)  # закрываем клешни
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_3, 55, 100, False, errTextC)  #поднимаем  правый сервопривод
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_4, -55, 100, False, errTextC)  # поднимаем левый сервопривод
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_1, -125, 150, False,errTextC)  # 1 сервопривод поворачивается на 125 градусов к 3 карте
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_4, 85, 100, False,errTextC)  # левый сервопривод отпускаем для прикладывания карты
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    time.sleep(3)  # ждем прикладывание
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_4, -85, 100, False, errTextC)  # левый сервопривод поднимаем
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_1, 35, 150, False,errTextC)  # 1 серво привод сервопривод поворачивается на 35 градусов
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_2, 200, 100, False, errTextC)  # открываем клешню для сброса карты 1
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    time.sleep(3)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_2, -200, 100, False,errTextC)  # закрываем клешню для сброса карты 1
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    cmd = 'adb shell input tap 325 953'  # команда для нажатия  кнопки "Базовый (карта)"
+    os.system(cmd)
+        # Поворот к 4 КАРТЕ
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_1,110, 150, False,errTextC)  # 1 серво привод сервопривод поворачивается на 110 градусов
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_2, 200, 150, False, errTextC)  # открываем клешни
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_3, -55, 100, False, errTextC)  # отпускается правый сервопривод
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_4, 55, 100, False, errTextC)  # отпускается левый сервопривод
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_2, -200, 150, False, errTextC)  # закрываем клешни
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_3, 55, 100, False, errTextC)  # поднимаем  правый сервопривод
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_4, -55, 100, False, errTextC)  # поднимаем левый сервопривод
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_1, -150, 145, False,errTextC)  # 1 сервопривод поворачивается на 145 градусов к 4 карте
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_4, 85, 100, False,errTextC)  # левый сервопривод отпускаем для прикладывания карты
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    time.sleep(3)  # ждем прикладывание
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_4, -85, 100, False, errTextC)  # левый сервопривод поднимаем
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_1, 35, 150, False,errTextC)  # 1 серво привод сервопривод поворачивается на 35 градусов
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_2, 200, 100, False, errTextC)  # открываем клешню для сброса карты 1
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+    time.sleep(3)
+    errCode = lib.RI_SDK_exec_ServoDrive_Turn(servo_2, -200, 100, False,errTextC)  # закрываем клешню для сброса карты 1
+    if errCode != 0:
+        print(errCode, errTextC.raw.decode())
+        sys.exit(2)
+
+main()
+
+cmd = 'adb shell input tap 294 1163' # команда для нажатия  кнопки "Базовый(нал)"
+os.system(cmd)
+time.sleep(4)
+cmd = 'adb shell input tap 237 374' # команда для нажатия на область "Смена"
+os.system(cmd)
+cmd = 'adb shell input tap 293 530' # команда для нажатия кнопки "Закрыть смену"
+os.system(cmd)
+cmd = 'adb shell input tap 292 541' # команда для нажатия поля Имя пользователя (Авторизация кассира)
+os.system(cmd)
+cmd = 'adb shell input text "2"' # ввод  Имя пользователя ((Авторизация кассира)
+os.system(cmd)
+time.sleep(2)
+cmd = 'adb shell input tap 100 469' # команда для нажатия поля Пароль (Авторизация кассира)
+os.system(cmd)
+cmd = 'adb shell input text "2"' # ввод  Пароля (Авторизация кассира)
+os.system(cmd)
+cmd = 'adb shell input tap 193 613' # команда для нажатия  кнопки "Войти"
+os.system(cmd)
+time.sleep(5)
+cmd = 'adb shell input tap 272 825' # команда для нажатия кнопки "Далее" (Закрытие батча)
+os.system(cmd)
+time.sleep(6)
+
+
+shiftid = response.json()['shift']['id']  # id смены из скрипта 2 (открытие смены)
+script = {
+    "auth": {
+        "token": f'{token}'                                  # токен авторизации из скрипта Авторизации
+    },
+        "shift": {
+        "id": f'{shiftid}'                               # id смены из скрипта Открытие смены водителя
+    }
+}
+
+url = "https://test-tkp.secgw.ru/v2-test-rr/closeShift"
+response = requests.post(url, json=script,verify=False)                # Запрос на  закрытия  смены
+print(response.json())
+
+if '"responseMessage":"success"' in response.text:
+    print("Закрытие смены", ":3 тест пройден")
+
+else:
+    print("Ошибка при Закрытие смены")
+    exit()
+
+terminalid=15111111  # номер терминала
+
+script = {
+
+         "SerialNumber" : "15111111",
+      "TotalPrintCount" : 41,
+       "TestPrintCount" : 0,
+  "DuplicatePrintCount" : 0,
+           "CashierFio" : "Иванов П. П.",
+      "CopyCashTickets" : 0,
+      "CopyCardTickets" : 0
+
+}
+
+
+url = f'https://test-tkp.secgw.ru/v2-test-rr/report-z?terminal_id={terminalid}&shift_id={shiftid}'
+headers= {'Content-Type': 'application/json', 'Authorization': f'Guid {token}'}
+response = requests.post(url,headers=headers,json=script,verify=False)                                                               # Запрос на  получение Z-отчета из ТКП
+print(response.json())
+
+if '"responseMessage":"Success"' in response.text:
+    print("Запрос Z-отчета из ТКП", ":4 тест пройден")
+
+else:
+    print("Ошибка при запросе Z-отчета из ТКП")
+    exit()
+
+
+
+
+
+
+
+
